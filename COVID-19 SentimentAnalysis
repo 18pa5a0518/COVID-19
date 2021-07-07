@@ -1,0 +1,389 @@
+it#Importing all the libraries into our code
+import numpy as np 
+import pandas as pd
+import nltk
+nltk.download('vader_lexicon')
+from nltk.sentiment.vader import SentimentIntensityAnalyzer as SIA
+!pip install twython
+import matplotlib.pyplot as plt
+import seaborn as sns
+import nltk
+nltk.download('stopwords')
+nltk.download('wordnet')
+from sklearn.naive_bayes import ComplementNB
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import BernoulliNB
+CNB = ComplementNB()
+GNB = GaussianNB()
+BNB = BernoulliNB()
+data=pd.read_csv('/content/drive/MyDrive/Document from V R Naidu undapalli')
+tweets_df=data
+tweets=data
+
+#shows the first two dataset rows
+data.head(2)
+
+#shows the number of tweets and colums in dataset
+print(f"data shape: {data.shape}")
+
+#shows the datatype of the dataset columns
+data.info()
+
+#finding the null values in dataset
+def missing_data(data):
+    total = data.isnull().sum()
+    percent = (data.isnull().sum()/data.isnull().count()*100)
+    tt = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
+    types = []
+    for col in data.columns:
+        dtype = str(data[col].dtype)
+        types.append(dtype)
+    tt['Types'] = types
+    return(np.transpose(tt))
+missing_data(data)
+
+#finding the unique values in dataset
+def unique_values(data):
+    total = data.count()
+    tt = pd.DataFrame(total)
+    tt.columns = ['Total']
+    uniques = []
+    for col in data.columns:
+        unique = data[col].nunique()
+        uniques.append(unique)
+    tt['Uniques'] = uniques
+    return(np.transpose(tt))
+unique_values(data)
+
+#Shows the Most frequent values in the dataset
+def most_frequent_values(data):
+    total = data.count()
+    tt = pd.DataFrame(total)
+    tt.columns = ['Total']
+    items = []
+    vals = []
+    for col in data.columns:
+        itm = data[col].value_counts().index[0]
+        val = data[col].value_counts().values[0]
+        items.append(itm)
+        vals.append(val)
+    tt['Most frequent item'] = items
+    tt['Frequence'] = vals
+    tt['Percent from total'] = np.round(vals / total * 100, 3)
+    return(np.transpose(tt))
+most_frequent_values(data)
+
+#Shows the graph for percentage of tweets coming from diff locations
+def plot_frequency_charts(df, feature, title, pallete):
+    freq_df = pd.DataFrame()
+    freq_df[feature] = df[feature]
+    
+    f, ax = plt.subplots(1,1, figsize=(16,4))
+    total = float(len(df))
+    g = sns.countplot(df[feature], order = df[feature].value_counts().index[:20], palette=pallete)
+    g.set_title("Number and percentage of {}".format(title))
+
+    for p in ax.patches:
+        height = p.get_height()
+        ax.text(p.get_x()+p.get_width()/2.,
+                height + 3,
+                '{:1.2f}%'.format(100*height/total),
+                ha="center") 
+
+    plt.title('Frequency of {} tweeting about Corona'.format(feature))
+    plt.ylabel('Frequency', fontsize=12)
+    plt.xlabel(title, fontsize=12)
+    plt.xticks(rotation=90)
+    plt.show()
+	
+plot_frequency_charts(data, 'user_location', 'User Locations', 'BuGn_r')
+
+#importing wordcloud & stopwords
+#worcloud is used to shows the most frequently occured words in the dataset and shows in size with respective to its occurances
+#Stopwords remove the unwanted words like i, am etc.. which doesn't provides much information to the text  
+from wordcloud import WordCloud, STOPWORDS
+stopwords = set(STOPWORDS)
+
+def show_wordcloud(data, title = None):
+    wordcloud = WordCloud(
+        background_color='white',
+        stopwords=stopwords,
+        max_words=50,
+        max_font_size=40, 
+        scale=5,
+        random_state=1
+    ).generate(str(data))
+
+    fig = plt.figure(1, figsize=(10,10))
+    plt.axis('off')
+    if title: 
+        fig.suptitle(title, fontsize=20)
+        fig.subplots_adjust(top=2.3)
+
+    plt.imshow(wordcloud)
+    plt.show()
+#Code shows the frequent occured positive , negative and neutral words in dataset
+from wordcloud import WordCloud, STOPWORDS
+def show_wordcloud(data, title=""):
+    text = " ".join(t for t in data.dropna())
+    stopwords = set(STOPWORDS)
+    stopwords.update(["t", "co", "https", "amp", "U"])
+    wordcloud = WordCloud(stopwords=stopwords, scale=4, max_font_size=50, max_words=500,background_color="black").generate(text)
+    fig = plt.figure(1, figsize=(12,12))
+    plt.axis('off')
+    fig.suptitle(title, fontsize=10)
+    fig.subplots_adjust(top=2.3)
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.show()
+show_wordcloud(tweets['text'], title = 'Prevalent words in tweets')
+
+show_wordcloud(tweets_df.loc[tweets_df['sentiment']=='Neutral', 'text'], title = 'Prevalent words in tweets (Neutral sentiment)')
+
+show_wordcloud(tweets_df.loc[tweets_df['sentiment']=='Negative', 'text'], title = 'Prevalent words in tweets (Negative sentiment)')
+
+tweets_df['datedt'] = pd.to_datetime(tweets_df['date'])
+tweets_df['year'] = tweets_df['datedt'].dt.year
+tweets_df['month'] = tweets_df['datedt'].dt.month
+tweets_df['day'] = tweets_df['datedt'].dt.day
+tweets_df['dayofweek'] = tweets_df['datedt'].dt.dayofweek
+tweets_df['hour'] = tweets_df['datedt'].dt.hour
+tweets_df['minute'] = tweets_df['datedt'].dt.minute
+tweets_df['dayofyear'] = tweets_df['datedt'].dt.dayofyear
+tweets_df['date_only'] = tweets_df['datedt'].dt.date
+tweets_agg_df = tweets_df.groupby(["date_only"])["text"].count().reset_index()
+tweets_agg_df.columns = ["date_only", "count"]
+def plot_time_variation(df, x='date_only', y='count', hue=None, size=1, title="", is_log=False):
+    f, ax = plt.subplots(1,1, figsize=(4*size,3*size))
+    g = sns.lineplot(x=x, y=y, hue=hue, data=df)
+    plt.xticks(rotation=90)
+    if hue:
+        plt.title(f'{y} grouped by {hue} | {title}')
+    else:
+        plt.title(f'{y} | {title}')
+    if(is_log):
+        ax.set(yscale="log")
+    ax.grid(color='black', linestyle='dotted', linewidth=0.75)
+    plt.show() 
+plot_time_variation(tweets_agg_df, title="Number of tweets / day of year",size=3)
+
+def plot_count(feature, title, df, size=1, ordered=True):
+    f, ax = plt.subplots(1,1, figsize=(4*size,4))
+    total = float(len(df))
+    if ordered:
+        g = sns.countplot(df[feature], order = df[feature].value_counts().index[:20], palette='Set3')
+    else:
+        g = sns.countplot(df[feature], palette='Set3')
+    g.set_title("Number and percentage of {}".format(title))
+    if(size > 2):
+        plt.xticks(rotation=90, size=8)
+    for p in ax.patches:
+        height = p.get_height()
+        ax.text(p.get_x()+p.get_width()/2.,
+                height,
+                '{:1.2f}%'.format(100*height/total),
+                ha="center") 
+    plt.show()
+	
+plot_count("dayofweek", "tweets / day of week", tweets_df, size=3, ordered=False)
+
+#Remove the unwanted wanted from the text which which doesn't provides any information to the text 
+import re
+def clean(text):
+    text = re.sub('https?://\S+|www\.\S+', '', text)
+    text = re.sub(r'\s+', ' ', text, flags=re.I)
+    text = re.sub('\[.*?\]', '', text)
+    text = re.sub('\n', '', text)
+    text = re.sub('\w*\d\w*', '', text)
+    text = re.sub('<.*?>+', '', text)
+    return text
+	
+data['text'] = data['text'].apply(lambda x:clean(x))
+
+'''SIA means sentiment intensity analyzer which tells that whether the text is positive negative and neutral based on compound scores'''
+sia=SIA()
+scores=[]
+for i in range(len(data['text'])):
+    
+    score = sia.polarity_scores(data['text'][i])
+    score=score['compound']
+    scores.append(score)
+sentiment=[]
+for i in scores:
+    if i>=0.05:
+        sentiment.append('Positive')
+    elif i<=(-0.05):
+        sentiment.append('Negative')
+    else:
+        sentiment.append('Neutral')
+data['sentiment']=pd.Series(np.array(sentiment))
+
+data
+
+#Removing all the unwanted words and apply stemming and lemming to the text
+import string
+
+def clean_text(text):
+    
+    text = str(text).lower()
+    text = re.sub('[%s]' % re.escape(string.punctuation), '', text)
+    
+    return text
+data['text'] = data['text'].apply(lambda x:clean_text(x))
+
+data['text']
+
+df=pd.DataFrame()
+df['text']=data['text']
+def tokenization(text):
+    text = re.split('\W+', text)
+    return text
+
+df['tokenized'] = df['text'].apply(lambda x: tokenization(x.lower()))
+stopword = nltk.corpus.stopwords.words('english')
+def remove_stopwords(text):
+    text = [word for word in text if word not in stopword]
+    return text
+    
+df['No_stopwords'] = df['tokenized'].apply(lambda x: remove_stopwords(x))
+
+ps = nltk.PorterStemmer()
+
+def stemming1(text):
+    text = [ps.stem(word) for word in text]
+    return text
+
+df['stemmed_porter'] = df['No_stopwords'].apply(lambda x: stemming1(x))
+
+from nltk.stem.snowball import SnowballStemmer
+s_stemmer = SnowballStemmer(language='english')
+def stemming2(text):
+    text = [s_stemmer.stem(word) for word in text]
+    return text
+df['stemmed_snowball'] = df['No_stopwords'].apply(lambda x: stemming2(x))
+
+wn = nltk.WordNetLemmatizer()
+
+def lemmatizer(text):
+    text = [wn.lemmatize(word) for word in text]
+    return text
+
+df['lemmatized'] = df['No_stopwords'].apply(lambda x: lemmatizer(x))
+
+df.head(10)
+
+data['text']=df['lemmatized']
+data.head(10)
+
+temp = data.groupby('sentiment').count()['text'].reset_index().sort_values(by='text',ascending=False)
+temp.style.background_gradient(cmap='Reds')
+
+#importing the naive bayes algorithm model and also train&test data for the model 
+from sklearn.feature_extraction.text import CountVectorizer
+from nltk.tokenize import RegexpTokenizer
+token = RegexpTokenizer(r'[a-zA-Z0-9]+')
+cv = CountVectorizer(stop_words='english',ngram_range = (1,1),tokenizer = token.tokenize)
+text_counts = cv.fit_transform(df['text'])
+from sklearn.model_selection import train_test_split
+X_train, X_test, Y_train, Y_test = train_test_split(text_counts, data['sentiment'], test_size=0.25, random_state=5)
+from sklearn.naive_bayes import MultinomialNB
+MNB = MultinomialNB()
+MNB.fit(X_train, Y_train)
+from sklearn import metrics
+predicted = MNB.predict(X_test)
+accuracy_score = metrics.accuracy_score(predicted, Y_test)
+print(accuracy_score)
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer()
+text_count_2 = tfidf.fit_transform(df['text'])
+
+#splitting the data in test and training
+#from sklearn.model_selection() import train_test_split()
+x_train, x_test, y_train, y_test = train_test_split(text_count_2, data['sentiment'],test_size=0.25,random_state=5)
+
+#defining the model
+#compilimg the model -> we are going to use already used models GNB, MNB, CNB, BNB
+#fitting the model
+MNB.fit(x_train, y_train)
+accuracy_score_mnb = metrics.accuracy_score(MNB.predict(x_test), y_test)
+print('accuracy_score_mnb = '+str('{:4.4f}'.format(accuracy_score_mnb*100))+'%')
+
+BNB.fit(x_train, y_train)
+accuracy_score_bnb = metrics.accuracy_score(BNB.predict(x_test), y_test)
+print('accuracy_score_bnb = '+str('{:4.2f}'.format(accuracy_score_bnb*100))+'%')
+
+CNB.fit(x_train, y_train)
+accuracy_score_cnb = metrics.accuracy_score(CNB.predict(x_test), y_test)
+print('accuracy_score_cnb = '+str('{:4.2f}'.format(accuracy_score_cnb*100))+'%')
+
+from sklearn.metrics import confusion_matrix as cm
+confu=cm(predicted, Y_test)
+
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    import itertools
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix')
+
+    print(cm)
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.tight_layout()
+plt.figure()
+plot_confusion_matrix(confu,classes=['Neutral', 'Positive', 'Negative'],
+                      title='Confusion matrix')
+					  
+					  
+from sklearn.metrics import classification_report
+print(classification_report(predicted, Y_test))
+
+from nltk.sentiment import SentimentIntensityAnalyzer
+sia = SentimentIntensityAnalyzer()
+def find_sentiment(post):
+    if sia.polarity_scores(post)["compound"] > 0:
+        return "Positive"
+    elif sia.polarity_scores(post)["compound"] < 0:
+        return "Negative"
+    else:
+        return "Neutral"
+		
+def plot_sentiment(df, feature, title):
+    counts = df[feature].value_counts()
+    percent = counts/sum(counts)
+
+    fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(12, 5))
+
+    counts.plot(kind='bar', ax=ax1, color='green')
+    percent.plot(kind='bar', ax=ax2, color='blue')
+    ax1.set_ylabel(f'Counts : {title} sentiments', size=12)
+    ax2.set_ylabel(f'Percentage : {title} sentiments', size=12)
+    plt.suptitle(f"Sentiment analysis for Covid-19 vaccine tweets", size=20, y=1.12)
+    plt.tight_layout()
+    plt.show()
+
+tweets['sentiment'] = tweets['text'].apply(lambda x: find_sentiment(x))
+plot_sentiment(tweets, 'sentiment', 'Text')
